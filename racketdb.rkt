@@ -4,18 +4,40 @@
   (rename-in "proto/ql2.rkt"
     [version-dummy:version->integer v->int]
     [term:term-type->integer term->int])
+  (rename-in racket/base
+    [not not-]
+    [floor floor-]
+    [round round-]
+    [append append-] 
+    [values values-]
+    [map map-]
+    [filter filter-]
+    [or or-]
+    [and and-]
+    [for-each for-each-])
   json)
 
 (provide
+  run/123 serialize-reql-term
   connect close-connection datum array object db db-create db-drop db-list table get get-all eq ne
-  lt le gt ge r:not add sub mul div mod r:floor ceil r:round r:append prepend difference
-  set-insert set-intersection set-union set-difference slice skip limit offsets-of contains
-  get-field keys r:values has-fields with-fields pluck without merge between reduce r:map fold
-  r:filter concat-map order-by distinct count is-empty union nth bracket inner-join outer-join
-  eq-join zip range insert-at delete-at change-at splice-at coerce-to type-of update delete replace
-  insert table-create table-drop table-list config wait reconfigure rebalance sync grant index-create
-  index-drop index-list index-status index-wait index-rename set-write-hook get-write-hook funcall
-  branch r:or r:and r:for-each run run*)
+  lt le gt ge add sub mul div mod ceil prepend difference set-insert set-intersection set-union
+  set-difference slice skip limit offsets-of contains get-field keys has-fields with-fields pluck
+  without merge between reduce fold concat-map order-by distinct count is-empty union nth bracket
+  inner-join outer-join eq-join zip range insert-at delete-at change-at splice-at coerce-to type-of
+  update delete replace insert table-create table-drop table-list config wait reconfigure rebalance
+  sync grant index-create index-drop index-list index-status index-wait index-rename set-write-hook
+  get-write-hook funcall branch run run*
+  (rename-out
+    [not r:not]
+    [floor r:floor] 
+    [round r:round]
+    [append r:append] 
+    [values r:values]
+    [map r:map]
+    [filter r:filter]
+    [or r:or]
+    [and r:and]
+    [for-each r:for-each])) 
 
 ;; *************************************************************************************************
 ;; *************************************************************************************************
@@ -73,14 +95,14 @@
 
 (define-chained-ops
   table get get-all
-  eq ne lt le gt ge r:not
+  eq ne lt le gt ge not
   add sub mul div mod
-  r:floor ceil r:round
-  r:append prepend difference
+  floor ceil round
+  append prepend difference
   set-insert set-intersection set-union set-difference
   slice skip limit offsets-of contains
-  get-field keys r:values has-fields with-fields pluck without merge
-  between reduce r:map fold r:filter concat-map order-by distinct count is-empty union nth bracket
+  get-field keys values has-fields with-fields pluck without merge
+  between reduce map fold filter concat-map order-by distinct count is-empty union nth bracket
   inner-join outer-join eq-join zip range
   insert-at delete-at change-at splice-at
   coerce-to type-of
@@ -88,7 +110,7 @@
   table-create table-drop table-list config wait reconfigure rebalance sync grant
   index-create index-drop index-list index-status index-wait index-rename
   set-write-hook get-write-hook
-  funcall branch r:or r:and r:for-each)
+  funcall branch or and for-each)
 
 ;; *************************************************************************************************
 ;; *************************************************************************************************
@@ -101,7 +123,7 @@
           [(hash? val) (string-append "{" (serialize-hash val) "}")]
           [else (string-append "\"" val "\"")]))
   (define (reql-datum? val)
-    (or (symbol? val) (number? val) (hash? val) (string? val)))
+    (or- (symbol? val) (number? val) (hash? val) (string? val)))
   (define (serialize-reql-term-list terms)
     (cond [(empty? terms) ""]
           [(empty? (rest terms)) (serialize-reql-term (first terms))]
