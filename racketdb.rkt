@@ -18,7 +18,7 @@
   json)
 
 (provide
-  run/123 serialize-reql-term
+  build-query serialize-reql-term
   connect close-connection datum array object db db-create db-drop db-list table get get-all eq ne
   lt le gt ge add sub mul div mod ceil prepend difference set-insert set-intersection set-union
   set-difference slice skip limit offsets-of contains get-field keys has-fields with-fields pluck
@@ -66,19 +66,19 @@
 
 (define-syntax-rule (defn-op-anchored opname)
   (define-syntax-rule (opname arg (... ...))
-    (lambda (builder)
+    (λ (builder)
       (builder (reql-term (term->int 'opname) (list arg (... ...)) '#hash())))))
 
 (define-syntax-rule (defn-op-chained opname)
   (define-syntax (opname stx)
     (syntax-case stx (with)
       [(_ arg (... ...) with opt)
-       #'(lambda (chained)
-           (lambda (builder)
+       #'(λ (chained)
+           (λ (builder)
              (builder (reql-term (term->int 'opname) (list chained arg (... ...)) opt))))]
       [(_ arg (... ...))
-       #'(lambda (chained)
-           (lambda (builder)
+       #'(λ (chained)
+           (λ (builder)
              (builder (reql-term (term->int 'opname) (list chained arg (... ...)) '#hash()))))])))
 
 (define-syntax-rule (define-anchored-ops op ...)
@@ -133,8 +133,8 @@
               ","
               (serialize-reql-term-list (rest terms)))]))
   (define (serialize-hash h)
-    (define tmp (hash-map h (lambda (k v) (string-append (serialize-datum k) ":" (serialize-datum v)))))
-    (foldr (lambda (x y) (string-append x "," y)) (first tmp) (rest tmp)))
+    (define tmp (hash-map h (λ (k v) (string-append (serialize-datum k) ":" (serialize-datum v)))))
+    (foldr (λ (x y) (string-append x "," y)) (first tmp) (rest tmp)))
   (cond [(reql-datum? term) (serialize-datum term)]
         [else (string-append "["
                              (number->string (reql-term-type term))
@@ -219,23 +219,27 @@
 ;; *************************************************************************************************
 ;; *************************************************************************************************
 
-(define (run/123 . args)
-  (cond ((empty? args) (lambda (x) x))
-        ((empty? (rest args)) ((first args) (lambda (x) x)))
-        (else
-          (let ((chain ((first args) (second args))))
-            (apply run/123 (cons chain (rest (rest args))))))))
+(define (build-query . commands)
+  (cond [(empty? commands) (λ (x) x)]
+        [(empty? (rest commands)) ((first commands) (λ (x) x))]
+        [else
+          (let ([chain ((first commands) (second commands))])
+            (apply build-query (cons chain (rest (rest commands)))))]))
 
-(define (run/456 . args)
-  (apply run/123 (cons (db "test") args)))
+(define (build-query-with-default . args)
+  (apply build-query (cons (db "test") args)))
 
-(define (run1 query connection)
+(define (run-helper query connection)
   (let ([token (get-token)])
     (start-query (serialize-reql-term query) token connection)
     (read-response token connection)))
 
-(define (run connection . query)
-  (run1 (apply run/123 query) connection))
+(define-syntax (run stx)
+  (syntax-case stx (with)
+    [(_ command ... with connection)
+     #'(run-helper (build-query command ...) connection)]))
 
-(define (run* connection . query)
-  (run1 (apply run/456 query) connection))
+(define-syntax (run* stx)
+  (syntax-case stx (with)
+    [(_ command ... with connection)
+     #'(run-helper (build-query-with-default command ...) connection)]))
