@@ -18,7 +18,6 @@
   json)
 
 (provide
-  build-query serialize-reql-term
   connect close-connection datum array object db db-create db-drop db-list table get get-all eq ne
   lt le gt ge add sub mul div mod ceil prepend difference set-insert set-intersection set-union
   set-difference slice skip limit offsets-of contains get-field keys has-fields with-fields pluck
@@ -90,8 +89,12 @@
 ;; *************************************************************************************************
 ;; *************************************************************************************************
 
+(define (datum arg) arg)
+(define (array . args)
+  (reql-term (term->int 'make-array) args '#hash()))
+
 (define-anchored-ops
-  datum array object db db-create db-drop db-list)
+  object db db-create db-drop db-list)
 
 (define-chained-ops
   table get get-all
