@@ -91,7 +91,7 @@
 ;; *************************************************************************************************
 ;; *************************************************************************************************
 
-(define (datum arg) arg)
+(define (datum arg) (λ (builder) (builder arg)))
 (define (array . args)
   (reql-term (term->int 'make-array) args '#hash()))
 
@@ -250,4 +250,4 @@
 (define-syntax (run* stx)
   (syntax-case stx (with)
     [(_ command ... with connection)
-     #'(run-helper (build-query-with-default command ...) connection)]))
+     #'(run-helper (build-query-with-default (db "test") command ...) connection)]))
