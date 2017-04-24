@@ -36,7 +36,8 @@
     [filter r:filter]
     [or r:or]
     [and r:and]
-    [for-each r:for-each])) 
+    [for-each r:for-each]
+    [build-query/partial partial])) 
 
 ;; *************************************************************************************************
 ;; *************************************************************************************************
@@ -45,14 +46,15 @@
   (let ([c (read-char in)])
     (if (char=? c #\nul) '() (cons c (read-null-term-str in)))))
 
-(define (connect [host "127.0.0.1"] [port 28015])
+(define (connect [host "127.0.0.1"] [port 28015] #:database [dbname #f])
   (define-values [in out] (tcp-connect host port))
   (write-bytes (integer->integer-bytes (v->int 'v0-4) 4 #f) out)
   (write-bytes (bytes #x00 #x00 #x00 #x00) out)
   (write-bytes (integer->integer-bytes (version-dummy:protocol->integer 'json) 4 #f) out)
   (flush-output out)
-  (let ([response (read-null-term-str in)])
-    (if (string=? (list->string response) "SUCCESS") (list in out) '())))
+  (let ([response (read-null-term-str in)]
+        [default (if dbname (db dbname) #f)])
+    (if (string=? (list->string response) "SUCCESS") (list in out default) '())))
 
 (define (close-connection connection)
   (close-input-port (first connection))
@@ -223,14 +225,15 @@
 ;; *************************************************************************************************
 
 (define (build-query . commands)
-  (cond [(empty? commands) (λ (x) x)]
-        [(empty? (rest commands)) ((first commands) (λ (x) x))]
-        [else
-          (let ([chain ((first commands) (second commands))])
-            (apply build-query (cons chain (rest (rest commands)))))]))
+  ((apply build-query/partial commands) (λ (x) x)))
 
-(define (build-query-with-default . args)
-  (apply build-query (cons (db "test") args)))
+(define (build-query/partial . commands)
+  (cond [(empty? (rest commands)) (first commands)]
+        [else (let ([chain ((first commands) (second commands))])
+                (apply build-query/partial (cons chain (rest (rest commands)))))]))
+
+(define (build-query-with-default default . args)
+  (apply build-query (cons default args)))
 
 (define (run-helper query connection)
   (let ([token (get-token)])
@@ -240,7 +243,9 @@
 (define-syntax (run stx)
   (syntax-case stx (with)
     [(_ command ... with connection)
-     #'(run-helper (build-query command ...) connection)]))
+     #'(run-helper (if (third connection)
+                       (build-query-with-default (third connection) command ...)
+                       (build-query command ...)) connection)]))
 
 (define-syntax (run* stx)
   (syntax-case stx (with)
