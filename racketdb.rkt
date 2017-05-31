@@ -1,6 +1,8 @@
 #lang racket
 
 (require
+  "reql-term.rkt"
+  (for-syntax "reql-term.rkt") ; there must be a better way
   (rename-in "proto/ql2.rkt"
     [version-dummy:version->integer v->int]
     [term:term-type->integer term->int])
@@ -15,9 +17,11 @@
     [or or-]
     [and and-]
     [for-each for-each-])
-  json)
+  json
+  (for-syntax racket/syntax))
 
 (provide
+  build-query r:lambda
   connect close-connection datum array object db db-create db-drop db-list table get get-all eq ne
   lt le gt ge add sub mul div mod ceil prepend difference set-insert set-intersection set-union
   set-difference slice skip limit offsets-of contains get-field keys has-fields with-fields pluck
@@ -62,8 +66,6 @@
 
 ;; *************************************************************************************************
 ;; *************************************************************************************************
-
-(struct reql-term (type args optargs) #:transparent)
 
 (define-syntax-rule (defn-op-anchored opname)
   (define-syntax-rule (opname arg (... ...))
@@ -116,6 +118,38 @@
   index-create index-drop index-list index-status index-wait index-rename
   set-write-hook get-write-hook
   funcall branch or and for-each)
+
+;; *************************************************************************************************
+;; *************************************************************************************************
+
+(begin-for-syntax
+  (define (make-args-hash alovars)
+    (build-list (length alovars) (lambda (n) (list (list-ref alovars n) (reql-term 10 (list (add1 n)) '#hash())))))
+
+  (define (find-in alop var)
+    (foldr (lambda (x y) (if (equal? (car x) var) (cadr x) y)) #f alop))
+
+  (define (array args)
+    (reql-term 2 args '#hash()))
+
+  (define (replace-vars vars expr)
+    (cond
+      [(null? expr) null]
+      [(pair? expr) (cons (replace-vars vars (car expr)) (replace-vars vars (cdr expr)))]
+      [else
+       (let ([new-val (find-in vars expr)])
+         (if new-val new-val expr))]))
+)
+
+(define-syntax (r:lambda stx)
+  (syntax-case stx ()
+    [(_ args body ...)
+      (with-syntax*
+        ([args-hash (datum->syntax stx (make-args-hash (syntax->datum #'args)))]
+         [args-hash-keys (datum->syntax stx (array (build-list (length (syntax->datum #'args-hash)) add1)))]
+         [(replaced ...) (datum->syntax stx (map (lambda (x) (replace-vars (syntax->datum #'args-hash) x)) (syntax->datum #'(body ...))))])
+      #'(reql-term 69 (list args-hash-keys (build-query replaced ...)) '#hash()))]))
+
 
 ;; *************************************************************************************************
 ;; *************************************************************************************************
