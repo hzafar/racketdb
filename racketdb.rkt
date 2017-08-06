@@ -217,7 +217,7 @@
               ","
               (serialize-reql-term-list (rest terms)))]))
   (define (serialize-hash h)
-    (define tmp (hash-map h (λ (k v) (string-append (serialize-datum k) ":" (serialize-datum v)))))
+    (define tmp (hash-map h (λ (k v) (string-append (serialize-datum k) ":" (serialize-reql-term v)))))
     (foldr (λ (x y) (string-append x "," y)) (first tmp) (rest tmp)))
   (cond [(reql-datum? term) (serialize-datum term)]
         [else (string-append "["
